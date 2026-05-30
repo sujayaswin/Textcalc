@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Centered safe zone group (66x66 starting at 21,21) -->
+    <group
+        android:translateX="21"
+        android:translateY="21">
+
+        <!-- Notepad / Document lines -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M10,15h40v4h-40zM10,25h30v4h-30zM10,35h46v4h-46zM10,45h20v4h-20z" />
+
+        <!-- Large Calculator Plus Sign integrated with text -->
+        <path
+            android:fillColor="#D0BCFF"
+            android:pathData="M44,40v10h10v6h-10v10h-6v-10h-10v-6h10v-10h6z" />
+
+        <!-- Blinking cursor representation -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M52,15h3v24h-3z" />
+
+    </group>
+</vector>
