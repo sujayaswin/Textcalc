@@ -73,19 +73,9 @@ Textcalc is a productivity-focused Android application that transforms a simple 
   - New document FAB triggers naming dialog
 
 ### Task_8_Final_Refinement_Verify: Refine UI to prominently display document names and perform final end-to-end verification.
-- **Status:** COMPLETED
-- **Updates:** Optimized app for minimal storage and memory footprint:
-- Enabled R8 code minification and resource shrinking in release builds.
-- Stripped unused dependencies (networking, image loading, location services).
-- Ensured usage of system fonts to avoid bundling large .ttf files.
-- Verified all icons are lightweight Vector Drawables.
-- Confirmed Room database schema is lean for text storage.
-- Forced Light Theme and ensured blank page initialization.
-- Implemented double-touch prevention and empty document discard logic.
-- Updated app icon to a purple theme merging calculator/text symbols.
-- Confirmed compliance with Android 17 privacy standards.
+- **Status:** IN_PROGRESS
+- **Updates:** Fixed a race condition in CalculatorViewModel initialization that caused new 'Untitled' documents to be created on startup instead of loading the last used one. The app now waits for the database query to complete before deciding to create a new document. Verified that lastModified is updated during edits and document selection. Ready for final verification.
 - **Acceptance Criteria:**
   - Current doc name in TopAppBar
   - Persistence verified across app restarts
-- **Duration:** N/A
 

@@ -18,6 +18,9 @@ import kotlinx.coroutines.launch
 
 class CalculatorViewModel(private val documentDao: DocumentDao) : ViewModel() {
 
+    private val _isInitialized = MutableStateFlow(false)
+    val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
+
     private val _currentDocumentId = MutableStateFlow<Int?>(null)
     val currentDocumentId: StateFlow<Int?> = _currentDocumentId.asStateFlow()
 
@@ -42,30 +45,54 @@ class CalculatorViewModel(private val documentDao: DocumentDao) : ViewModel() {
         )
 
     init {
+        loadLastDocument()
+    }
+
+    private fun loadLastDocument() {
         viewModelScope.launch {
-            allDocuments.collect { docs ->
-                if (_currentDocumentId.value == null && docs.isNotEmpty()) {
-                    selectDocument(docs.first())
-                } else if (docs.isEmpty()) {
-                    createNewDocument("Untitled")
-                }
+            // Fetch directly from DAO to avoid waiting for StateFlow initialization
+            val docs = documentDao.getAllDocuments().first()
+            
+            if (docs.isNotEmpty()) {
+                val latest = docs.first()
+                _currentDocumentId.value = latest.id
+                _inputText.value = latest.content
+            } else {
+                // Completely empty database, create the very first document
+                val newDoc = Document(title = "Untitled", content = "")
+                val id = documentDao.insertDocument(newDoc)
+                _currentDocumentId.value = id.toInt()
+                _inputText.value = ""
             }
+            _isInitialized.value = true
         }
     }
 
     fun onTextChanged(newText: String) {
+        if (!_isInitialized.value) return
         _inputText.value = newText
         saveCurrentDocument()
     }
 
     fun selectDocument(document: Document) {
+        if (!_isInitialized.value || _currentDocumentId.value == document.id) return
+
         discardEmptyCurrentDocument()
+        
         _currentDocumentId.value = document.id
         _inputText.value = document.content
+        
+        // Update lastModified when selecting a document to bring it to top next time
+        viewModelScope.launch {
+            val updatedDoc = document.copy(lastModified = System.currentTimeMillis())
+            documentDao.updateDocument(updatedDoc)
+        }
     }
 
     fun createNewDocument(name: String) {
+        if (!_isInitialized.value) return
         discardEmptyCurrentDocument()
+        
         viewModelScope.launch {
             val newDoc = Document(title = name, content = "")
             val id = documentDao.insertDocument(newDoc)
@@ -81,12 +108,27 @@ class CalculatorViewModel(private val documentDao: DocumentDao) : ViewModel() {
     }
 
     fun deleteCurrentDocument() {
+        if (!_isInitialized.value) return
         val id = _currentDocumentId.value ?: return
         viewModelScope.launch {
             val currentDoc = documentDao.getDocumentById(id)
             if (currentDoc != null) {
                 documentDao.deleteDocument(currentDoc)
                 _currentDocumentId.value = null
+                
+                // After deletion, select the next available document
+                val docs = documentDao.getAllDocuments().first()
+                if (docs.isNotEmpty()) {
+                    val nextDoc = docs.first()
+                    _currentDocumentId.value = nextDoc.id
+                    _inputText.value = nextDoc.content
+                } else {
+                    // Force create a new one if we deleted the last one
+                    val newDoc = Document(title = "Untitled", content = "")
+                    val newId = documentDao.insertDocument(newDoc)
+                    _currentDocumentId.value = newId.toInt()
+                    _inputText.value = ""
+                }
             }
         }
     }
@@ -94,12 +136,17 @@ class CalculatorViewModel(private val documentDao: DocumentDao) : ViewModel() {
     private fun discardEmptyCurrentDocument() {
         val id = _currentDocumentId.value ?: return
         val content = _inputText.value
-        if (content.isBlank()) {
+        val currentDoc = currentDocument.value ?: return
+
+        // CONSERVATIVE DISCARD CRITERIA:
+        // 1. Must be "Untitled" (unnamed)
+        // 2. Must be blank or whitespace-only
+        // 3. Must NOT be the only document in the database
+        if (currentDoc.title == "Untitled" && content.isBlank()) {
             viewModelScope.launch {
-                val currentDoc = documentDao.getDocumentById(id)
-                // Only delete if it's not the only document
-                val allDocs = allDocuments.value
-                if (currentDoc != null && allDocs.size > 1) {
+                // Double check database state
+                val allDocs = documentDao.getAllDocuments().first()
+                if (allDocs.size > 1) {
                     documentDao.deleteDocument(currentDoc)
                 }
             }
@@ -108,11 +155,12 @@ class CalculatorViewModel(private val documentDao: DocumentDao) : ViewModel() {
 
     private fun saveCurrentDocument() {
         val id = _currentDocumentId.value ?: return
+        val content = _inputText.value
         viewModelScope.launch {
             val currentDoc = documentDao.getDocumentById(id)
             if (currentDoc != null) {
                 val updatedDoc = currentDoc.copy(
-                    content = _inputText.value,
+                    content = content,
                     lastModified = System.currentTimeMillis()
                 )
                 documentDao.updateDocument(updatedDoc)
